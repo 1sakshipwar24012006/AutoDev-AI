@@ -1,0 +1,68 @@
+{
+  "plan": {
+    "summary": "Fix apply_discount to return the discounted price and make average_price safe for empty lists.",
+    "root_cause": "apply_discount multiplies price by percent/100, which is the discount amount; average_price divides by len(prices) without guarding the empty case.",
+    "files_to_modify": [
+      "shop/pricing.py",
+      "tests/test_pricing_regression.py"
+    ],
+    "steps": [
+      "Return price * (1 - percent / 100) from apply_discount.",
+      "Return 0.0 from average_price when the list is empty.",
+      "Add regression tests in a new test file."
+    ],
+    "test_strategy": "Run the existing pytest suite plus a new regression test file.",
+    "risks": [
+      "Floating point rounding for fractional percentages."
+    ]
+  },
+  "codegen": [
+    {
+      "explanation": "Fix apply_discount so it returns the discounted price.",
+      "commit_message": "Fix apply_discount to return discounted price",
+      "edits": [
+        {
+          "path": "shop/pricing.py",
+          "operation": "replace_text",
+          "old_text": "    return price * (percent / 100)\n",
+          "new_text": "    return price * (1 - percent / 100)\n"
+        }
+      ]
+    },
+    {
+      "explanation": "apply_discount now returns the discounted price (price * (1 - percent/100)) instead of the discount amount, and average_price returns 0.0 for an empty list. Added regression tests covering both cases and the cart total.",
+      "commit_message": "Fix discount calculation and empty-list average",
+      "edits": [
+        {
+          "path": "shop/pricing.py",
+          "operation": "replace_text",
+          "old_text": "    return price * (percent / 100)\n",
+          "new_text": "    return price * (1 - percent / 100)\n"
+        },
+        {
+          "path": "shop/pricing.py",
+          "operation": "replace_text",
+          "old_text": "    return sum(prices) / len(prices)\n",
+          "new_text": "    if not prices:\n        return 0.0\n    return sum(prices) / len(prices)\n"
+        },
+        {
+          "path": "tests/test_pricing_regression.py",
+          "operation": "create",
+          "content": "import pytest\n\nfrom shop.cart import Cart\nfrom shop.pricing import apply_discount, average_price\n\n\ndef test_discount_returns_price_after_discount():\n    assert apply_discount(200, 25) == pytest.approx(150)\n\n\ndef test_fractional_discount():\n    assert apply_discount(80, 12.5) == pytest.approx(70)\n\n\ndef test_empty_average_is_zero():\n    assert average_price([]) == 0.0\n\n\ndef test_cart_total_uses_discounted_price():\n    cart = Cart()\n    cart.add('lamp', 40)\n    assert cart.total(discount_percent=50) == pytest.approx(20)\n"
+        }
+      ]
+    }
+  ],
+  "review": [
+    {
+      "approved": true,
+      "summary": "The fix addresses both root causes with minimal changes, leaves existing tests untouched and adds regression coverage.",
+      "concerns": [
+        {
+          "severity": "nit",
+          "message": "Consider validating that prices are non-negative in apply_discount."
+        }
+      ]
+    }
+  ]
+}
